@@ -82,6 +82,11 @@ def format_number(n) -> str:
         return f"${n:.2f}"
     return str(n)
 
+def research_stock(ticker):
+    data = get_stock_data(ticker)
+    analysis = analyze_stock(data)
+    return data, analysis
+
 
 def main():
     parser = argparse.ArgumentParser(description="Stock Research Agent")
