@@ -1,5 +1,5 @@
-langchain
-langchain-core
-langchain-openai
+streamlit
 yfinance
 python-dotenv
+langchain-google-genai
+langchain-core
