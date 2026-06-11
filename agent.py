@@ -1,11 +1,5 @@
 """
 Stock Research Agent using Gemini + Yahoo Finance.
-
-Provides comprehensive stock analysis:
-- Real-time stock data
-- Financial metrics
-- Analyst ratings
-- AI-powered investment summary
 """
 
 import argparse
@@ -15,14 +9,24 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# ---------- API KEY HANDLING ----------
+try:
+    import streamlit as st
+
+    if "GOOGLE_API_KEY" in st.secrets:
+        GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+    else:
+        GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+except Exception:
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
     raise ValueError(
-        "GOOGLE_API_KEY not found. "
-        "Set it in your .env file or Streamlit Secrets."
+        "GOOGLE_API_KEY not found. Add it to .env or Streamlit Secrets."
     )
 
+# ---------- YFINANCE ----------
 try:
     import yfinance as yf
     HAS_YFINANCE = True
@@ -92,14 +96,14 @@ def analyze_stock(data: dict) -> str:
     messages = [
         SystemMessage(
             content=(
-                "You are a financial analyst. "
-                "Provide a concise stock analysis covering:\n"
-                "1. Investment Thesis (2-3 sentences)\n"
-                "2. Key Strengths (3 bullet points)\n"
-                "3. Key Risks (3 bullet points)\n"
+                "You are a financial analyst.\n"
+                "Provide:\n"
+                "1. Investment Thesis\n"
+                "2. Key Strengths (3 bullets)\n"
+                "3. Key Risks (3 bullets)\n"
                 "4. Valuation Assessment\n"
                 "5. Verdict (Buy/Hold/Sell)\n\n"
-                "Keep the response under 300 words."
+                "Keep under 300 words."
             )
         ),
         HumanMessage(
@@ -116,28 +120,31 @@ def analyze_stock(data: dict) -> str:
     return response.content
 
 
-def format_number(n) -> str:
+def format_number(n):
     if isinstance(n, (int, float)):
         if n >= 1e12:
-            return f"${n / 1e12:.2f}T"
+            return f"${n/1e12:.2f}T"
 
         if n >= 1e9:
-            return f"${n / 1e9:.2f}B"
+            return f"${n/1e9:.2f}B"
 
         if n >= 1e6:
-            return f"${n / 1e6:.2f}M"
+            return f"${n/1e6:.2f}M"
 
         return f"${n:.2f}"
 
     return str(n)
 
 
+def get_stock_history(ticker):
+    stock = yf.Ticker(ticker)
+    return stock.history(period="1y")
+
+
 def research_stock(ticker):
     data = get_stock_data(ticker)
     analysis = analyze_stock(data)
-
-    stock = yf.Ticker(ticker)
-    history = stock.history(period="1y")
+    history = get_stock_history(ticker)
 
     return data, analysis, history
 
@@ -168,8 +175,7 @@ def main():
 
     print(
         f"Price: ${data.get('price', 'N/A')} | "
-        f"Market Cap: "
-        f"{format_number(data.get('market_cap', 0))}"
+        f"Market Cap: {format_number(data.get('market_cap', 0))}"
     )
 
     print(
@@ -188,22 +194,10 @@ def main():
         f"${data.get('52w_high')}"
     )
 
-    analyst_rating = (
-        data.get("analyst_rating")
-        or "N/A"
-    )
-
-    print(
-        f"Analyst: "
-        f"{str(analyst_rating).upper()} | "
-        f"Target: ${data.get('target_price', 'N/A')}"
-    )
-
     print("\n🤖 AI Analysis:")
     print("-" * 40)
 
-    analysis = analyze_stock(data)
-    print(analysis)
+    print(analyze_stock(data))
 
 
 if __name__ == "__main__":
