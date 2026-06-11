@@ -1,5 +1,11 @@
 """
 Stock Research Agent using Gemini + Yahoo Finance.
+
+Provides comprehensive stock analysis:
+- Real-time stock data
+- Financial metrics
+- Analyst ratings
+- AI-powered investment summary
 """
 
 import argparse
@@ -9,24 +15,31 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ---------- API KEY HANDLING ----------
+# ==========================
+# API KEY HANDLING
+# ==========================
+
 try:
     import streamlit as st
 
-    if "GOOGLE_API_KEY" in st.secrets:
-        GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
-    else:
-        GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+    GOOGLE_API_KEY = st.secrets.get(
+        "GOOGLE_API_KEY",
+        os.getenv("GOOGLE_API_KEY")
+    )
 
 except Exception:
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
     raise ValueError(
-        "GOOGLE_API_KEY not found. Add it to .env or Streamlit Secrets."
+        "GOOGLE_API_KEY not found. "
+        "Add it to .env or Streamlit Secrets."
     )
 
-# ---------- YFINANCE ----------
+# ==========================
+# YFINANCE
+# ==========================
+
 try:
     import yfinance as yf
     HAS_YFINANCE = True
@@ -38,6 +51,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 
 def get_stock_data(ticker: str) -> dict:
+
     if not HAS_YFINANCE:
         return {
             "ticker": ticker,
@@ -81,6 +95,7 @@ def get_stock_data(ticker: str) -> dict:
 
 
 def analyze_stock(data: dict) -> str:
+
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
         google_api_key=GOOGLE_API_KEY,
@@ -96,14 +111,14 @@ def analyze_stock(data: dict) -> str:
     messages = [
         SystemMessage(
             content=(
-                "You are a financial analyst.\n"
+                "You are a professional financial analyst.\n\n"
                 "Provide:\n"
-                "1. Investment Thesis\n"
-                "2. Key Strengths (3 bullets)\n"
-                "3. Key Risks (3 bullets)\n"
+                "1. Investment Thesis (2-3 sentences)\n"
+                "2. Key Strengths (3 bullet points)\n"
+                "3. Key Risks (3 bullet points)\n"
                 "4. Valuation Assessment\n"
                 "5. Verdict (Buy/Hold/Sell)\n\n"
-                "Keep under 300 words."
+                "Keep the response under 300 words."
             )
         ),
         HumanMessage(
@@ -121,15 +136,17 @@ def analyze_stock(data: dict) -> str:
 
 
 def format_number(n):
+
     if isinstance(n, (int, float)):
+
         if n >= 1e12:
-            return f"${n/1e12:.2f}T"
+            return f"${n / 1e12:.2f}T"
 
         if n >= 1e9:
-            return f"${n/1e9:.2f}B"
+            return f"${n / 1e9:.2f}B"
 
         if n >= 1e6:
-            return f"${n/1e6:.2f}M"
+            return f"${n / 1e6:.2f}M"
 
         return f"${n:.2f}"
 
@@ -137,19 +154,27 @@ def format_number(n):
 
 
 def get_stock_history(ticker):
+
     stock = yf.Ticker(ticker)
-    return stock.history(period="1y")
+
+    return stock.history(
+        period="1y"
+    )
 
 
 def research_stock(ticker):
+
     data = get_stock_data(ticker)
+
     analysis = analyze_stock(data)
+
     history = get_stock_history(ticker)
 
     return data, analysis, history
 
 
 def main():
+
     parser = argparse.ArgumentParser(
         description="Stock Research Agent"
     )
@@ -194,10 +219,19 @@ def main():
         f"${data.get('52w_high')}"
     )
 
+    analyst_rating = data.get("analyst_rating") or "N/A"
+
+    print(
+        f"Analyst: {str(analyst_rating).upper()} | "
+        f"Target: ${data.get('target_price', 'N/A')}"
+    )
+
     print("\n🤖 AI Analysis:")
     print("-" * 40)
 
-    print(analyze_stock(data))
+    analysis = analyze_stock(data)
+
+    print(analysis)
 
 
 if __name__ == "__main__":
