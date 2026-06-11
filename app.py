@@ -1,5 +1,9 @@
 import streamlit as st
-from agent import research_stock, format_number
+
+from agent import (
+    research_stock,
+    format_number
+)
 
 st.set_page_config(
     page_title="AI Stock Research Agent",
@@ -8,7 +12,9 @@ st.set_page_config(
 )
 
 st.title("📈 AI Stock Research Agent")
-st.write("Analyze stocks using Yahoo Finance and Gemini AI")
+st.write(
+    "Analyze stocks using Yahoo Finance and Gemini AI"
+)
 
 ticker = st.text_input(
     "Enter Stock Ticker",
@@ -17,15 +23,23 @@ ticker = st.text_input(
 
 if st.button("Analyze"):
 
-
     if not ticker.strip():
-        st.warning("Please enter a stock ticker.")
+        st.warning(
+            "Please enter a stock ticker."
+        )
         st.stop()
 
     try:
-        with st.spinner("Researching stock..."):
-            data, analysis = research_stock(ticker)
+        with st.spinner(
+            "Researching stock..."
+        ):
+            data, analysis, history = (
+                research_stock(ticker)
+            )
 
+        # ---------------------
+        # Metrics
+        # ---------------------
 
         st.subheader("📊 Stock Metrics")
 
@@ -43,7 +57,9 @@ if st.button("Analyze"):
 
         col3.metric(
             "Market Cap",
-            format_number(data["market_cap"])
+            format_number(
+                data["market_cap"]
+            )
         )
 
         col1, col2, col3 = st.columns(3)
@@ -55,8 +71,13 @@ if st.button("Analyze"):
 
         target_price = data["target_price"]
 
-        if isinstance(target_price, (int, float)):
-            target_price = f"${target_price:.2f}"
+        if isinstance(
+            target_price,
+            (int, float)
+        ):
+            target_price = (
+                f"${target_price:.2f}"
+            )
 
         col2.metric(
             "Target Price",
@@ -65,18 +86,56 @@ if st.button("Analyze"):
 
         col3.metric(
             "Analyst Rating",
-            str(data["analyst_rating"]).upper()
+            str(
+                data["analyst_rating"]
+            ).upper()
         )
 
         st.divider()
 
+        # ---------------------
+        # Chart
+        # ---------------------
 
-        with st.expander("🏢 Company Overview"):
-            st.write(data["description"])
+        st.subheader(
+            "📈 1-Year Stock Price History"
+        )
 
+        if not history.empty:
+            st.line_chart(
+                history["Close"]
+            )
+        else:
+            st.warning(
+                "No historical data available."
+            )
 
-        st.subheader("🤖 AI Analysis")
+        st.divider()
+
+        # ---------------------
+        # Company Overview
+        # ---------------------
+
+        with st.expander(
+            "🏢 Company Overview"
+        ):
+            st.write(
+                data["description"]
+            )
+
+        st.divider()
+
+        # ---------------------
+        # AI Analysis
+        # ---------------------
+
+        st.subheader(
+            "🤖 AI Analysis"
+        )
+
         st.markdown(analysis)
 
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(
+            f"Error: {e}"
+        )

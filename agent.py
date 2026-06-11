@@ -1,16 +1,14 @@
 """
-Stock Research Agent using Agno + Yahoo Finance.
+Stock Research Agent using Gemini + Yahoo Finance.
 
-Provides comprehensive stock analysis: price data, financials,
-analyst ratings, and AI-powered investment summary.
-
-Usage:
-    python agent.py --ticker AAPL
-    python agent.py --ticker NVDA
+Provides comprehensive stock analysis:
+- Real-time stock data
+- Financial metrics
+- Analyst ratings
+- AI-powered investment summary
 """
 
 import argparse
-import os
 
 from dotenv import load_dotenv
 
@@ -28,7 +26,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 def get_stock_data(ticker: str) -> dict:
     if not HAS_YFINANCE:
-        return {"ticker": ticker, "error": "yfinance not installed", "mock": True}
+        return {"ticker": ticker, "error": "yfinance not installed"}
 
     stock = yf.Ticker(ticker)
     info = stock.info
@@ -50,21 +48,43 @@ def get_stock_data(ticker: str) -> dict:
         "52w_low": info.get("fiftyTwoWeekLow", "N/A"),
         "analyst_rating": info.get("recommendationKey", "N/A"),
         "target_price": info.get("targetMeanPrice", "N/A"),
-        "description": info.get("longBusinessSummary", "")[:500],
+        "description": info.get("longBusinessSummary", "")[:1000],
     }
 
 
 def analyze_stock(data: dict) -> str:
     llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0
-)
+        model="gemini-2.5-flash",
+        temperature=0
+    )
 
-    stock_info = "\n".join(f"{k}: {v}" for k, v in data.items() if k != "description")
+    stock_info = "\n".join(
+        f"{k}: {v}"
+        for k, v in data.items()
+        if k != "description"
+    )
 
     messages = [
-        SystemMessage(content="You are a financial analyst. Provide a concise stock analysis covering: Investment Thesis (2-3 sentences), Key Strengths (3 bullets), Key Risks (3 bullets), Valuation Assessment, and a Verdict (Buy/Hold/Sell with brief reasoning). Keep it under 300 words."),
-        HumanMessage(content=f"Analyze this stock:\n{stock_info}\n\nCompany description: {data.get('description', 'N/A')}"),
+        SystemMessage(
+            content=(
+                "You are a financial analyst. "
+                "Provide a concise stock analysis covering:\n"
+                "1. Investment Thesis (2-3 sentences)\n"
+                "2. Key Strengths (3 bullets)\n"
+                "3. Key Risks (3 bullets)\n"
+                "4. Valuation Assessment\n"
+                "5. Verdict (Buy/Hold/Sell)\n\n"
+                "Keep the response under 300 words."
+            )
+        ),
+        HumanMessage(
+            content=(
+                f"Analyze this stock:\n\n"
+                f"{stock_info}\n\n"
+                f"Company description:\n"
+                f"{data.get('description', 'N/A')}"
+            )
+        )
     ]
 
     response = llm.invoke(messages)
@@ -74,43 +94,57 @@ def analyze_stock(data: dict) -> str:
 def format_number(n) -> str:
     if isinstance(n, (int, float)):
         if n >= 1e12:
-            return f"${n/1e12:.2f}T"
+            return f"${n / 1e12:.2f}T"
         if n >= 1e9:
-            return f"${n/1e9:.2f}B"
+            return f"${n / 1e9:.2f}B"
         if n >= 1e6:
-            return f"${n/1e6:.2f}M"
+            return f"${n / 1e6:.2f}M"
+
         return f"${n:.2f}"
+
     return str(n)
+
 
 def research_stock(ticker):
     data = get_stock_data(ticker)
     analysis = analyze_stock(data)
-    return data, analysis
+
+    stock = yf.Ticker(ticker)
+    history = stock.history(period="1y")
+
+    return data, analysis, history
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Stock Research Agent")
-    parser.add_argument("--ticker", required=True, help="Stock ticker symbol (e.g., AAPL)")
-    args = parser.parse_args()
+    parser = argparse.ArgumentParser(
+        description="Stock Research Agent"
+    )
 
-    print(f"\n📈 Researching {args.ticker}...\n")
+    parser.add_argument(
+        "--ticker",
+        required=True,
+        help="Stock ticker symbol"
+    )
+
+    args = parser.parse_args()
 
     data = get_stock_data(args.ticker)
 
-    print("=" * 60)
-    print(f"📊 {data.get('name', args.ticker)} ({args.ticker})")
-    print("=" * 60)
-    print(f"Price: ${data.get('price', 'N/A')}  |  Market Cap: {format_number(data.get('market_cap', 0))}")
-    print(f"Sector: {data.get('sector')}  |  Industry: {data.get('industry')}")
-    print(f"P/E: {data.get('pe_ratio')}  |  Forward P/E: {data.get('forward_pe')}  |  PEG: {data.get('peg_ratio')}")
-    print(f"52W Range: ${data.get('52w_low')} - ${data.get('52w_high')}")
-    analyst_rating = data.get("analyst_rating") or "N/A"
-    print(f"Analyst: {str(analyst_rating).upper()}  |  Target: ${data.get('target_price', 'N/A')}")
+    print(f"\n📈 Researching {args.ticker}\n")
 
-    print("\n🤖 AI Analysis:")
+    print("=" * 60)
+    print(f"📊 {data.get('name', args.ticker)}")
+    print("=" * 60)
+
+    print(
+        f"Price: ${data['price']} | "
+        f"Market Cap: {format_number(data['market_cap'])}"
+    )
+
+    print("\n🤖 AI Analysis")
     print("-" * 40)
-    analysis = analyze_stock(data)
-    print(analysis)
+
+    print(analyze_stock(data))
 
 
 if __name__ == "__main__":
