@@ -9,10 +9,19 @@ Provides comprehensive stock analysis:
 """
 
 import argparse
+import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+if not GOOGLE_API_KEY:
+    raise ValueError(
+        "GOOGLE_API_KEY not found. "
+        "Set it in your .env file or Streamlit Secrets."
+    )
 
 try:
     import yfinance as yf
@@ -26,7 +35,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 def get_stock_data(ticker: str) -> dict:
     if not HAS_YFINANCE:
-        return {"ticker": ticker, "error": "yfinance not installed"}
+        return {
+            "ticker": ticker,
+            "error": "yfinance not installed"
+        }
 
     stock = yf.Ticker(ticker)
     info = stock.info
@@ -36,7 +48,10 @@ def get_stock_data(ticker: str) -> dict:
         "name": info.get("longName", ticker),
         "sector": info.get("sector", "N/A"),
         "industry": info.get("industry", "N/A"),
-        "price": info.get("currentPrice", info.get("regularMarketPrice", 0)),
+        "price": info.get(
+            "currentPrice",
+            info.get("regularMarketPrice", 0)
+        ),
         "market_cap": info.get("marketCap", 0),
         "pe_ratio": info.get("trailingPE", "N/A"),
         "forward_pe": info.get("forwardPE", "N/A"),
@@ -46,15 +61,25 @@ def get_stock_data(ticker: str) -> dict:
         "dividend_yield": info.get("dividendYield", 0),
         "52w_high": info.get("fiftyTwoWeekHigh", "N/A"),
         "52w_low": info.get("fiftyTwoWeekLow", "N/A"),
-        "analyst_rating": info.get("recommendationKey", "N/A"),
-        "target_price": info.get("targetMeanPrice", "N/A"),
-        "description": info.get("longBusinessSummary", "")[:1000],
+        "analyst_rating": info.get(
+            "recommendationKey",
+            "N/A"
+        ),
+        "target_price": info.get(
+            "targetMeanPrice",
+            "N/A"
+        ),
+        "description": info.get(
+            "longBusinessSummary",
+            ""
+        )[:1000],
     }
 
 
 def analyze_stock(data: dict) -> str:
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
+        google_api_key=GOOGLE_API_KEY,
         temperature=0
     )
 
@@ -70,8 +95,8 @@ def analyze_stock(data: dict) -> str:
                 "You are a financial analyst. "
                 "Provide a concise stock analysis covering:\n"
                 "1. Investment Thesis (2-3 sentences)\n"
-                "2. Key Strengths (3 bullets)\n"
-                "3. Key Risks (3 bullets)\n"
+                "2. Key Strengths (3 bullet points)\n"
+                "3. Key Risks (3 bullet points)\n"
                 "4. Valuation Assessment\n"
                 "5. Verdict (Buy/Hold/Sell)\n\n"
                 "Keep the response under 300 words."
@@ -81,7 +106,7 @@ def analyze_stock(data: dict) -> str:
             content=(
                 f"Analyze this stock:\n\n"
                 f"{stock_info}\n\n"
-                f"Company description:\n"
+                f"Company Description:\n"
                 f"{data.get('description', 'N/A')}"
             )
         )
@@ -95,8 +120,10 @@ def format_number(n) -> str:
     if isinstance(n, (int, float)):
         if n >= 1e12:
             return f"${n / 1e12:.2f}T"
+
         if n >= 1e9:
             return f"${n / 1e9:.2f}B"
+
         if n >= 1e6:
             return f"${n / 1e6:.2f}M"
 
@@ -128,23 +155,55 @@ def main():
 
     args = parser.parse_args()
 
+    print(f"\n📈 Researching {args.ticker}...\n")
+
     data = get_stock_data(args.ticker)
 
-    print(f"\n📈 Researching {args.ticker}\n")
-
     print("=" * 60)
-    print(f"📊 {data.get('name', args.ticker)}")
+    print(
+        f"📊 {data.get('name', args.ticker)} "
+        f"({args.ticker})"
+    )
     print("=" * 60)
 
     print(
-        f"Price: ${data['price']} | "
-        f"Market Cap: {format_number(data['market_cap'])}"
+        f"Price: ${data.get('price', 'N/A')} | "
+        f"Market Cap: "
+        f"{format_number(data.get('market_cap', 0))}"
     )
 
-    print("\n🤖 AI Analysis")
+    print(
+        f"Sector: {data.get('sector')} | "
+        f"Industry: {data.get('industry')}"
+    )
+
+    print(
+        f"P/E: {data.get('pe_ratio')} | "
+        f"Forward P/E: {data.get('forward_pe')}"
+    )
+
+    print(
+        f"52W Range: "
+        f"${data.get('52w_low')} - "
+        f"${data.get('52w_high')}"
+    )
+
+    analyst_rating = (
+        data.get("analyst_rating")
+        or "N/A"
+    )
+
+    print(
+        f"Analyst: "
+        f"{str(analyst_rating).upper()} | "
+        f"Target: ${data.get('target_price', 'N/A')}"
+    )
+
+    print("\n🤖 AI Analysis:")
     print("-" * 40)
 
-    print(analyze_stock(data))
+    analysis = analyze_stock(data)
+    print(analysis)
 
 
 if __name__ == "__main__":
